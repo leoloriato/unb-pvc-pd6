@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
 		print('End of epoch %d / %d \t Time Taken: %d sec' %   (epoch, train_opt.niter, time.time() - epoch_start_time))
 		model.update_learning_rate()
-		if epoch > 100 and epoch % train_opt.save_epoch_freq == 0:
+		if epoch % train_opt.save_epoch_freq == 0:
 			print('saving the model at the end of epoch %d, iters %d' % (epoch, total_steps))
 			model.save_networks('latest')
 			model.save_networks(epoch)
@@ -108,7 +108,8 @@ if __name__ == '__main__':
 					test_loss_iter.append(model.loss_segmentation)
 					print('test epoch {0:}, iters: {1:}/{2:} '.format(epoch, epoch_iter, len(test_dataset) * test_opt.batch_size), end='\r')
 
-			avg_test_loss = np.mean(test_loss_iter)
+			avg_test_loss = 0#np.mean(test_loss_iter)
+			
 			glob,mean,iou = getScores(conf_mat)
 			visualizer.print_current_scores(epoch, avg_test_loss, glob, mean, iou)
 			visualizer.save_confusion_matrix(conf_mat, epoch)
