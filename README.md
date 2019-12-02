@@ -1,110 +1,122 @@
-<!-- <img src='imgs/horse2zebra.gif' align="right" width=384> -->
-<!-- <br><br><br> -->
+# FuseNet: a profundiade realmente ajuda?
 
-# [FuseNet](https://github.com/tum-vision/fusenet) implementation in PyTorch
+Este é um trabalho acadêmico da disciplina de Visão Computacional do Prof.Teófilo do CIC/UnB.
 
-This is the PyTorch implementation for FuseNet, developed based on [Pix2Pix](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) code.
+OBS: O código-fonte contido na pasta src é a implementação de [Aygün](https://github.com/MehmetAygun/fusenet-pytorch) do FuseNet para o Pytorch, tendo sido realizada apenas algumas adaptações pontuais para consecução dos objetivos deste trabalho. Obrigado, Aygün !!
 
-## Prerequisites
+## Requisitos
 - Linux
-- Python 3.7.0
+- OpenCV 3+
+- Python 3.6.8
+- Pytorch 1.3.1
 - CPU or NVIDIA GPU + CUDA CuDNN
+(**atenção**: o Pytorch utiliza o CUDA no treinamento e teste da CNN)
+- Numpy 1.16.1
+(**atenção**: a versão do numpy não pode ser maior do que essa, por conta de incompatibilidade do código implementado)
+- Scipy 1.1.0
+(**atenção**: a versão do scipy não pode ser maior do que essa, por conta de incompatibilidade do código implementado)
+- visdom 0.1.8.5
+- h5py
+- dominate
+- outros (consultar src/requirements.txt)
 
-## Getting Started
-### Installation
-- Install PyTorch 0.4.1.post2 and dependencies from http://pytorch.org
-- Clone this repo:
+## Estrutura
+- Pasta _relatorio_ com código fonte do relatório
+- Arquivo _Leonardo_Loriato.pdf_ com o relatório
+- Pasta _src_ contendo o código principal do projeto, cujos principais arquivos são:
+  - _pd5.py_ - Arquivo principal do projeto, que deve ser executado para fins de verificação da tarefa
+  - _train.py_ - Programa do Aygün utilizado para treinamento do FuseNet
+  - _test.py_ - Programa do Aygün utilizado para teste do FuseNet
+  - _requirements.txt_ - Arquivos com as dependências Python do Projeto
+  - _checkpoints_ - Diretório criado durante o treinamento para armazenamento temporário dos dados do modelo
+  - _checkpoints/nyuv2/latest_net_FuseNet.pth_ - arquivo em que são salvos os pesos da FuseNet, necessários para o teste
+
+## Instalação e configuração
+- Instale o [OpenCV 3+](https://www.learnopencv.com/install-opencv3-on-ubuntu/)
+- Instale o Python 3 e o Pip3 (se não estiverem instalados)
 ```bash
-git clone https://github.com/MehmetAygun/fusenet-pytorch
-cd fusenet-pytorch
-pip install -r requirements.txt
+sudo apt-get update
+sudo apt-get install python3 python3-pip
 ```
-## Dataset preparation
-### sunrgbd dataset
-- Download and untar the [preprocessed sunrgbd](https://vision.in.tum.de/webarchive/hazirbas/fusenet-pytorch/sun/sunrgbd.tar.gz) dataset under ```/datasets/sunrgbd```
-
-### nyuv2 dataset
-- Download the dataset and create the training set
+- Instale as dependências do projeto
 ```bash
-cd datasets
-sh download_nyuv2.sh
+pip3 install -r requirements.txt
+```
+- Por via das dúvidas, assegure que os seguintes pacotes foram instalados:
+```bash
+pip3 install torch torchvision torchfile
+pip3 install h5py
+pip3 install dominate
+pip3 install visdom
+pip3 install scipy==1.1.0
+pip3 install numpy==1.16.1
+```
+
+
+## Carga de dados do NYUDv2
+- Execute os seguintes comandos:
+```bash
+cd src
+./pd6.sh --load-data
+```
+- É possível que o wget não consiga baixar corretamente os arquivos, dando erro durante o treinamento do modelo. Nesse caso, será necessário baixar manualmente os seguintes arquivos, salvando-os na pasta src/datasets
+```bash
+http://horatio.cs.nyu.edu/mit/silberman/nyu_depth_v2/nyu_depth_v2_labeled.mat
+http://horatio.cs.nyu.edu/mit/silberman/indoor_seg_sup/splits.mat
+https://github.com/tum-vision/fusenet/blob/master/fusenet/data/nyuv2_13class_mapping.mat
+```
+- Além disso, será necessário executar manualmente a preparação dos dados com o seguinte comando:
+```bash
+cd src/datasets
 python create_training_set.py
 ```
-### scannetv2 dataset
-- Download the ```scannet_frames_25k``` and ```scannet_frames_test``` under ```/datasets/scannet/tasks/```
 
-## FuseNet train/test
+## Treinamento dos modelos
 
-### visdom visualization
-- To view training errors and loss plots, set `--display_id 1`, run `python -m visdom.server` and click the URL http://localhost:8097
-- Checkpoints are saved under `./checkpoints/sunrgbd/`
-
-### train & test on sunrgbd
+### Modelo original da Fusenet
 ```bash
-python train.py --dataroot datasets/sunrgbd --dataset sunrgbd --name sunrgbd
-
-python test.py --dataroot datasets/sunrgbd --dataset sunrgbd --name sunrgbd --epoch 400
+cd src
+./pd6.sh --train-original
 ```
 
-### train & test on nyuv2
+### Modelo modificado da Fusenet sem a CBR 5 do branch depth
 ```bash
-python train.py --dataroot datasets/nyuv2 --dataset nyuv2 --name nyuv2
-
-python test.py --dataroot datasets/nyuv2 --dataset nyuv2 --name nyuv2 --epoch 400
+cd src
+./pd6.sh --train-no-cbr5
 ```
 
-### train & val & test on scannetv2
+### Modelo modificado da Fusenet sem as CBR 4 e 5 do branch depth
 ```bash
-python train.py --dataroot datasets/scannet/tasks/scannet_frames_25k --dataset scannetv2 \
-                --name scannetv2
-
-python test.py --dataroot datasets/scannet/tasks/scannet_frames_25k --dataset scannetv2 \
-               --name scannetv2 --epoch 380 --phase val
-
-python test.py --dataroot datasets/scannet/tasks/scannet_frames_test --dataset scannetv2 \
-               --name scannetv2 --epoch 380 --phase test
+cd src
+./pd6.sh --train-no-cbr4-5
 ```
 
-## Results
-* We use the training scheme defined in FuseNet
-* Loss is weighted for SUNRGBD dataset
-* Learning rate is set to 0.01 for NYUv2 dataset
-* Results can be improved with a hyper-parameter search
-* Results on the scannetv2-test (w/o class-weighted loss) can be found [here](http://kaldir.vc.in.tum.de/scannet_benchmark/result_details?id=67)
-
-<table>
-<tr>
-<td colspan=1> <b>Dataset <td colspan=3> <b>FuseNet-SF5 (CAFFE) <td colspan=3> <b>FuseNet-SF5
-<tr>
-<td> <td> overall <td> mean <td> iou <td> overall <td> mean <td> iou
-<tr>
-<td> <a href="https://vision.in.tum.de/webarchive/hazirbas/fusenet-pytorch/sun/400_net_FuseNet.pth"> <b>sunrgbd </a> <td> 76.30 <td> 48.30 <td> 37.30 <td> 75.41 <td> 46.48 <td> 35.69
-<tr>
-<td> <a href="https://vision.in.tum.de/webarchive/hazirbas/fusenet-pytorch/nyu/400_net_FuseNet.pth"> <b>nyuv2 </a> <td> 66.00 <td> 43.40 <td> 32.70 <td>  68.76 <td> 46.42 <td> 35.48
-<tr>
-<td> <a href="https://vision.in.tum.de/webarchive/hazirbas/fusenet-pytorch/scannet/260_net_FuseNet.pth"> <b>scannetv2-val </a> <td> -- <td> -- <td> -- <td> 76.32 <td> 55.84 <td> 44.12
-<tr>
-<td> <a href="https://vision.in.tum.de/webarchive/hazirbas/fusenet-pytorch/scannet/380_net_FuseNet.pth">
-<b>scannetv2-cls_weighted-val </a> <td> -- <td> -- <td> -- <td> 76.26 <td> 55.74 <td> 44.40
-</table>
-
-| scannetv2-test | avg iou | bathtub | bed  | bookshelf | cabinet | chair | counter | curtain | desk | door | floor | other furniture | picture | refrigerator | shower curtain | sink | sofa | table | toilet | wall | window | 
-|-----------------|---------|---------|------|-----------|---------|-------|---------|---------|------|------|-------|----------------|---------|--------------|----------------|------|------|-------|--------|------|--------| 
-| no-cls_weighted | 52.1    | 59.1    | 68.2 | 22.0      | 48.8    | 27.9  | 34.4    | 61.0    | 46.1 | 47.5 | 91.0  | 29.3           | 44.7    | 51.2         | 39.7           | 61.8 | 56.7 | 45.2  | 73.4   | 78.2 | 56.6   | 
-| cls_weighted    | 53.5    | 57.0    | 68.1 | 18.2      | 51.2    | 29.0  | 43.1    | 65.9    | 50.4 | 49.5 | 90.3  | 30.8           | 42.8    | 52.3         | 36.5           | 67.6 | 62.1 | 47.0  | 76.2   | 77.9 | 54.1   |
-
-
-
-## Citation
+### Modelo modificado da Fusenet sem as CBR 2 a 5 do branch depth
+```bash
+cd src
+./pd6.sh --train-no-cbr2-5
 ```
-@inproceedings{hazirbas16fusenet,
-  Title                    = {{FuseNet}: Incorporating Depth into Semantic Segmentation via Fusion-Based CNN Architecture},
-  Author                   = {Hazirbas, Caner and Ma, Lingni and Domokos, Csaba and Cremers, Daniel},
-  Booktitle                = {Asian Conference on Computer Vision ({ACCV})},
-  Year                     = {2016},
-  Doi                      = {10.1007/978-3-319-54181-5_14},
-  Url                      = {https://github.com/tum-vision/fusenet}
-}
+
+### Modelo modificado da Fusenet sem o branch depth
+```bash
+cd src
+./pd6.sh --train-no-depth
 ```
-## Acknowledgments
-Code is inspired by [pytorch-CycleGAN-and-pix2pix]((https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix)).
+
+### Modelo modificado da Fusenet somente com a fusão da CBR 5 do branch depth
+```bash
+cd src
+./pd6.sh --train-cbr5-only
+```
+
+## Teste do modelo previamente treinado
+```bash
+cd src
+./pd6.sh --test
+```
+### Visualização dos resultados
+- Os dados estarão disponíveis em src/checkpoints/nyuv2/web
+- Eles poderão ser visualizados por meio do visdom, bastando rodar o comando abaixo e acessar o seguinte [endereço](http://localhost:8097/):
+```bash
+python -m visdom.server
+```
