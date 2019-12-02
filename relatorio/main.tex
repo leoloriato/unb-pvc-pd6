@@ -1,0 +1,236 @@
+\documentclass{bmvc2k}
+
+%\usepackage[brazilian]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{bm}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{tabularx}
+\usepackage{siunitx}
+
+
+\title{FuseNet: profundidade realmente ajuda?}
+
+% Enter the paper's authors in order
+% \addauthor{Name}{email/homepage}{INSTITUTION_CODE}
+\addauthor{Leonardo Amato Loriato}{leoloriato@gmail.com}{1}
+
+% Enter the institutions
+% \addinstitution{Name\\Address}
+\addinstitution{
+  Departamento de Ci\^encia da Computa\c{c}\~ao\\
+  Universidade de Bras\'{\i}lia\\
+  Campus Darcy Ribeiro, Asa Norte\\
+  Bras\'{\i}lia-DF, CEP 70910-900, Brazil,  
+}
+
+\runninghead{Loriato, L.A.}{PD6 -- \today}
+
+% Any macro definitions you would like to include
+% These are not defined in the style file, because they don't begin
+% with \bmva, so they might conflict with the user's own macros.
+% The \bmvaOneDot macro adds a full stop unless there is one in the
+% text already.
+\def\eg{\emph{e.g}\bmvaOneDot}
+\def\ie{\emph{i.e}\bmvaOneDot}
+\def\Eg{\emph{E.g}\bmvaOneDot}
+\def\etal{\emph{et al}\bmvaOneDot}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand\blfootnote[1]{%
+  \begingroup
+  \renewcommand\thefootnote{}\footnote{#1}%
+  \addtocounter{footnote}{-1}%
+  \endgroup
+}
+
+
+%-------------------------------------------------------------------------
+% Document starts here
+\begin{document}
+\begin{NoHyper}
+\maketitle
+\end{NoHyper}
+
+\begin{abstract}
+O presente trabalho teve por objeto testar se a profundidade do dataset NYUDv2 incrementa a performance da \textit{FuseNet} para segmentação semântica de imagens. Para se testar essa hipótese, foram treinados o modelo original proposto, uma alteração desse sem o \textit{branch depth} e 4 alterações intermediárias. Como resultado, comprovou-se que a adição da profundidade não permite ganhos expressivos à \textit{FuseNet} ao longo das épocas treinadas. O modelo original obteve a segunda pior IoU, ao passo que a versão sem \textit{depth} obteve a segunda melhor performance. Ao final, propõe-se uma modificação da arquitetura, batizada de \textit{LateFuseNet}, desligando-se os 4 primeiros blocos de fusões.
+\end{abstract}
+
+%-------------------------------------------------------------------------
+\section{Introdução}
+\label{sec:intro} 
+
+Segmentação semântica de imagens é um problema da Visão Computacional que visa a determinar a exata localização dos objetos de determinadas classes em uma imagem, inserindo-se no contexto da sub-área de reconhecimento de objetos, conforme a figura \ref{fig:evol}. Antes do advento das redes neurais convolucionais (CNNs) por LeCun \etal ~\cite{lecun} e de sua popularização para esse tipo de tarefa, em decorrência da AlexNet ~\cite{alexnet}, esse problema era solucionado por meio de métodos não supervisionados de identificação de pontos de interesse, tais como o SIFT, proposto por Lowe ~\cite{lowe}, o SURF ~\cite{surf} e o \textit{Harris Corner Detector} ~\cite{harris}.
+
+\begin{figure}[htb]
+\centering
+\subfigure[Classificação de imagens]{\includegraphics[width=25mm]{figs/fig1a.png}}\quad
+\subfigure[Localização de objetos]{\includegraphics[width=25mm]{figs/fig1b.png}}\quad
+\subfigure[Segmentação semântica]{\includegraphics[width=25mm]{figs/fig1c.png}}\quad
+\subfigure[Segmentação de imagens]{\includegraphics[width=25mm]{figs/fig1d.png}}\quad
+\caption{Evolução do reconhecimento de objetos. Fonte: ~\cite{garcia}}.
+\label{fig:evol}
+\end{figure}
+
+Segundo Fei Fei ~\cite{feifei} a arquitetura das redes neurais convolucionais (CNNs) parte da premissa de que as entradas são imagens e, por essa razão, é possível aplicar certas propriedades que permitem reduzir a quantidade de parâmetros e escalar a classificação de imagens grandes de uma maneira que não é possível nas redes neurais ordinárias. Nas redes neurais, as entradas dos neurônios são tensores tridimensionais, que representam a largura, altura e profundidade, que é composta por 3 canais, no caso de datasets RGB, ou 4 canais, no caso de datasets RGB-D, também chamados de 2.5D, por Garcia-Garcia \etal ~\cite{garcia}. 
+
+Um desses datasets RGB-D é o NYU Depth Dataset V2 (NYUDv2), objeto deste trabalho, que, segundo Silberman \etal ~\cite{silberman}, consiste de 1449 imagens RGB-D, capturadas por meio do \textit{Microsoft Kinect device} e dividas das seguinte maneira: 795 imagens para treinamento e 654 para testes. Para Garcia-Garcia \etal, esse dataset é famoso pela sua natureza \textit{indoor}, que o torna útil para certas tarefas de robôs em casa.
+
+Ainda segundo Fei-Fei, além da AlexNet e da CNN de LeCun, quatro outras arquiteturas de CNN merecem nota: a ZFNet ~\cite{zfnet}; a VGGNet ~\cite{vggnet}; a GoogLeNet ~\cite{googlenet}; e a ResNet ~\cite{resnet}, sendo essa arquitetura o estado da arte em termos de CNN segundo a autora. Dentre essas arquiteturas, destaca-se a VGGNet, também conhecida pelo acrônimo VGG-16, por possuir 16 camadas de convolução, sendo essa a base da FuseNet ~\cite{fusenet}, que será descrita posteriormente. Trata-se de uma arquitetura que tem, como principal evolução em relação à sua antecessora, AlexNet, a utilização de \textit{kernels} menores nas convoluções, que reduzem a quantidade de parâmetros e aumentam a não linearidade do modelo, o que facilita seu treinamento.
+
+Dando sequência na literatura das CNNs, Long \etal ~\cite{long} introduziu a arquitetura denominada \textit{Fully Convolutional Network} (FCN), na qual as camadas \textit{fully-conected} originais das CNNs eram substituídas por imagens de resolução baixa, contendo mapas de \textit{features} para segmentação semântica de imagens. Uma das mais famosas FCNs é U-Net ~\cite{unet}, originalmente concebida para segmentação semântica de imagens biomédicas.
+
+Para Garcia-Garcia \etal ~\cite{garcia}, as FCNs ainda são atualmente o estado da arte no uso de Deep Learning para segmentação semântica, sendo puramente impeditiva para determinados problemas, em decorrência de diversas características intrínsecas, dentre as quais se destaca a sua invariância espacial inerente, que não leva em conta determinadas informações úteis de contexto global.
+
+Para contornar esse problema, foi concebida uma abordagem \textit{enconder-decoder}, em que a entrada da imagem é progressivamente reduzida por meio das convoluções do ramo \textit{encoder}, para serem posteriormente e suavemente super-amostradas (\textit{upsampling}) no ramo \textit{decoder}, até se atingir a resolução da imagem original. Nesse último processo duas abordagens distintas podem ser realizadas: as operações de deconvoluções, propostas por Noh \etal ~\cite{noh} em sua arquitetura denominada DeconvNet; e as operações de \textit{smoothed unpooling}, propostas por Badrinarayanan \etal ~\cite{segnet}, no âmbito da SegNet.
+
+No contexto de datasets RGB-D, foco deste trabalho, para Hazirbas \etal ~\cite{fusenet}, a abordagem mais trivial para lidar com segentação semântica nesse tipo de dataset seria a inserção de um quarto canal de profundidade D, normalizado de 0 a 255, em adição aos 3 canais RGB, em CNNs como a VGG-16 Net. Contudo, segundo o autor, essa abordagem é pobre, não explorando todo o potencial que o mapa de profundidade pode dar para a cena codificada na imagem.
+
+Nesse sentido, Gupta \etal ~\cite{gupta} propôs uma abordagem denominada \textit{Horizontal Height Angle} (HHA), em que se calcula com base na disparidade D, a altura e o ângulo entre o vetor normal e o vetor gravidade, adicionando essas 3 informações ao RGB e construindo uma imagem com 6 canais de informações. Por meio dessa técnica, houve uma melhora na solução para esse problema específico de segmentação semântica RGB-D. Contudo, Hazirbas \etal destaca 2 problemas do HHA: o alto custo computacional para determinação dos canais HHA; e o fato dos canais RGB ainda dominarem a representação HHA, mesmo com as informações adicionais apuradas. 
+
+Para solucionar esses problemas, Hazirbas \etal propõe a arquitetura FuseNet, uma FCN \textit{enconder-decoder}, inspirada na DeconvNet ~\cite{noh} e na SegNet ~\cite{segnet}, na qual existem dois ramos de \textit{enconder}, além do de \textit{decoder}: um para tratar as informações dos três canais de cores RGB das imagens e outro para tratar as informações do quarto canal D (profundidade), normalizado de 0 a 255, conforme a figura \ref{fig:fusenet1}. Esses ramos seguem a mesma estrutura da VGG Net de 16 camadas ~\cite{vggnet}, exceto pelo fato de que os blocos $fc5$, $ fc6$ e $fc7$ dessa são substituídos por blocos denominados $CBR$, que consistem de uma sequência de uma normalização \textit{batch}, uma operação de convolução e uma função de ativação $ReLU$ (\textit{Rectified Linear Unit}) ~\cite{relu}.
+
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{cc}
+	\bmvaHangBox{\fbox{\includegraphics[width=90mm]{figs/fig2.png}}} \\
+	\end{tabular}
+\end{center}
+\caption{Arquitetura da FuseNet. Fonte: ~\cite{fusenet}}
+\label{fig:fusenet1}
+\end{figure}
+
+Conforme se observa, o componente-chave dessa arquitetura é o bloco de fusão, no qual os mapas de \textit{features} provenientes das convoluções dos ramos do RGB e do D são mesclados por meio da operação de soma elemento-a-elemento nos tensores. De acordo com Hazirbas \etal ~\cite{fusenet}, essas fusões sempre ocorrem após os blocos $CBR$, havendo porém duas abordagens possíveis de fusões: a fusão esparsa, na qual a camada de fusão é inserida apenas antes da operação de \textit{pooling}; e a fusão densa, na qual a camada de fusão é inserida sempre após cada bloco $CBR$. Em testes realizados no \textit{SUN RGB-D Scene Understanding Benchmark} ~\cite{song}, Hazirbas \etal verificou que ambas as estratégias possuem performance similares, havendo uma ligeira melhoria quando utilizada a estratégia de fusão esparsa.
+
+Por fim, além desses ramos \textit{enconder}, existem um único ramo \textit{decoder}, no qual as informações dos mapas de \textit{features} RGB-D são progressivamente super-amostradas (\textit{upsample}) até atingirem o tamanho normal original da imagem com a segmentação dos objetos na imagem. Esse \textit{upsample} é feito por meio de \textit{unpoolings}, conforme proposto por Badrinarayanan \etal ~\cite{segnet}, embora Hazirbas \etal ~\cite{fusenet} tenha observado uma performance similar utilizando a deconvolução proposta por Noh \etal ~\cite{noh} em experimentos utilizando os datasets da ImageNet ~\cite{imagenet} e do \textit{SUN RGB-D Scene Understanding Benchmark} ~\cite{song}.
+
+%-------------------------------------------------------------------------
+\section{Metodologia}
+\label{sec:met}
+
+%-------------------------------------------------------------------------
+\subsection{Ferramentas utilizadas e carga de dados}
+
+Para a realização do presente trabalho, foi utilizado uma máquina virtual provisionada no \textit{Google Cloud Compute Engine}, do tipo \textit{n1-standart-8} (8 vCPUs e 30 GB de memória RAM), com um disco rígido de 100 GB e uma placa de vídeo Nvidia Tesla K80, com 11 GB de memória de vídeo. Nessa VM, foi instalado um Ubuntu 18.04 LTS, OpenCV 3.2.0 e Python 3.6.8, Pytorch, Numpy 1.16.1, h5py e diversas outras bibliotecas Python listadas no repositório do trabalho no GitHub ~\cite{github}.
+
+Para realizar os testes, utilizou-se a implementação dessa rede em Pytorch da FuseNet feita por Aygün ~\cite{aygun}, que, por sua vez, é inspirada na implementação do Projeto CycleGan e do Projeto Pix-2-pix em Pytorch, feita por Zhu ~\cite{zhu}. 
+
+Para carga dos dados, utilizou-se o script disponibilizado no projeto de Aygün, denominado $datasets/create\_training\_set.py$, que baixa o dataset NYUDv2 provido pelo TUM Computer Vision Group ~\cite{tum}. Após o download dessas dados, efetua-se o mapeamento das 894 classes originais rotuladas por Silberman \etal ~\cite{silberman}. Nesse ponto, diferentemente, do código original de Aygün, que mapeia as classes originais do NYUDv2 para 40 classes, neste trabalho, utilizou-se o mapeamento para 13 classes, também fornecido pelo TUM Vision.
+
+Após a realização desse mapeamento, as imagens são formatadas no padrão 320x240 pixels, utilizando a interpolação bilinear do OpenCV ~\cite{opencv}. Especificamente para o canal D (profundidade) da imagem, é feita uma interpolação linear, utilizando-se a máxima e mínima profundidade dos pixels da imagem em questão, de modo que o valor do canal D seja convertido numericamente de 0 a 255, a semelhança dos canais RGB da imagem. Por fim, salva-se em um arquivo .npy um dicionário contendo os canais RGB das imagens ($rgb\_images$), o canal D das imagens ($depth\_images$) e o \textit{ground-truth} da segmentação das imagens ($masks$).
+
+\subsection{Experimentos realizados}
+
+A fim de verificar a influência da profundidade na performance e no treinamento da FuseNet foram concebidos 6 experimentos diferentes com modificações dessa arquitetura, a saber: \textit{(i)} um com a arquitetura original proposta por Hazirbas \etal ~\cite{fusenet}, a fim de servir como grupo de controle; \textit{(ii)} um com a modificação dessa arquitetura, removendo-se a CBR 5 do \textit{branch depth}; \textit{(iii)} outro removendo-se as CBRs 4 e 5 do \textit{branch depth}; \textit{(iv)} outro removendo-se as CBRs 2 a 5 do \textit{branch depth}; \textit{(v)} outro removendo-se totalmente o \textit{branch depth} da FuseNet; e \textit{(vi)}, por fim, um último experimento mantendo-se apenas ligado bloco de fusão da CBR 5 do \textit{branch depth}, desligando-se todas as outras fusões.
+
+Para cada um desses experimentos, treinaram-se os modelos com a utilização de \textit{batches} de 4 imagens cada, obtidas por amostragem aleatória, até se completar a população de 795 imagens utilizadas, em cada época. Ao todo foram treinadas 50 épocas para cada um dos experimentos mencionados supra, sendo testadados os modelos a cada 5 épocas com a população de 654 imagens separadas no NYUDv2 para testes, sendo apuradas nessas ocasiões a métrica de \textit{Intersection over Union} (IoU) ~\cite{rosebrock}.
+
+Para otimização do modelo, foi utilizado o SGD (\textit{Stochastic Gradient Descent}), com $momentum=0,9$, \textit{learning-rate} $lr = 0,001$ e $weight\_decay = 0,0005$. Como função de perda, utilizou-se a \textit{Cross Entropy Loss} ~\cite{crossentropyloss}. Por fim, conforme recomendação trazida por Hazirbas \etal ~\cite{fusenet}, no treinamento foram utilizadas funções de \textit{dropout}, a fim de aprimorar o treinamento do modelo.
+
+Por fim, especificamente para o testes do modelo, foram utilizados \textit{batches} seriais, \ie sem amostragem aleatória no dataet NYUv2, com 1 imagem cada, até atingir a poulação total de 654 imagens separadas no NYUDv2 para testes. Também diferentemente do treinamento, no caso dos testes, não foram utilizadas funções de \textit{dropout}, que são desabilitadas durante essa etapa.
+
+%-------------------------------------------------------------------------
+\section{Resultados}
+\label{sec:res}
+
+Os resultados da métrica de IoU, apurados a cada 5 épocas, em um total de 50, para cada um dos 6 experimentos, são descritos na tabela ~\ref{table:iou} e no gráfico ~\ref{fig:comparativoIoU}. Da análise da tabela e do gráfico, observa-se que a maioria dos experimentos tiveram performance muito similar, sendo que a rede que obteve mais perfomance foi aquela em que se manteve apenas ligado o bloco de fusão da CBR5 do \textit{branch depth}. 
+
+\begin{table}[h!]
+	\tiny
+\centering
+\begin{tabular}{||c c c c c c c||} 
+ \hline
+Época & Original & S/ CBR5 & S/ CBR 4-5 & S/ CBR 2-5 & S/ \textit{Depth} & Só CBR 5 \\ [0.5ex]
+\hline \hline
+ 5 & 1,97\% & 2,92\% & 2,48\% & 4,50\% & 4,68\% & 3,29\% \\
+10 & 4,86\% & 4,31\% & 4,67\% & 6,63\% & 4,73\% & 6,64\% \\
+15 & 3,84\% & 3,45\% & 3,87\% & 4,94\% & 3,96\% & 5,50\% \\
+20 & 3,04\% & 2,79\% & 1,58\% & 3,28\% & 4,40\% & 4,45\% \\
+25 & 4,68\% & 4,43\% & 4,50\% & 4,84\% & 3,61\% & 5,56\% \\
+30 & 4,68\% & 3,74\% & 3,47\% & 4,44\% & 4,26\% & 5,23\% \\
+35 & 5,93\% & 5,50\% & 5,69\% & 5,64\% & 4,92\% & 6,63\% \\
+40 & 6,87\% & 6,41\% & 7,66\% & 7,25\% & 6,03\% & 7,87\% \\
+45 & 6,93\% & 6,83\% & 7,12\% & 7,10\% & 6,62\% & 8,82\% \\
+50 & 6,51\% & 6,12\% & 7,02\% & 7,58\% & 8,08\% & 9,47\% \\
+\hline
+\end{tabular}
+\caption{IoU no treinamento das 50 épocas de cada experimento.}
+\label{table:iou}
+\end{table}
+
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{cc}
+	\bmvaHangBox{\fbox{\includegraphics[width=120mm]{figs/fig3.png}}} \\
+\end{tabular}
+\end{center}
+\caption{Evolução da IoU para cada experimento}.
+\label{fig:comparativoIoU}
+\end{figure}
+
+A segunda melhor performance foi a da rede FuseNet com o \textit{branch depth} totalmente desligado, com resultado de IoU superior ao da rede FuseNet original. Isso, somado ao fato de que as modificações intermediárias (sem CBR5, sem CBR 4-5 e sem CBR 2-5) também obtiveram resultados similares ao da rede FuseNet original mostra que a adição do canal de profundidade não agrega muito na segmentação semântica de imagens da base RGB-D NYUDv2 por essa arquitetura. Uma explicação para isso, está no fato de, segundo Hazirbas \etal ~\cite{fusenet}, a FuseNet ser baseada na rede VGG-16 ~\cite{vggnet} pré-treinada na ImageNet ~\cite{imagenet}. Como essa base de dados possui cerca de 14 milhões de imagens RGB rotuladas, o excesso de treinamento da rede neural nessa base acaba por suplantar qualquer aprendizado adicional a ser realizado pelo \textit{branch} de profundidade.
+
+Há um outro fator para o canal de profundidade não fornecer ganhos à FuseNet: segundo Couprie \etal ~\cite{couprie}, a segmentação semântica de objetos cuja profundidade possui alta variância na cena (\eg, cama em um quarto) não performa bem no caso de uso de profundidade, sendo melhor usar apenas valores RGB para esses caso. Além disso, conforme explica Mousavian \etal ~\cite{mousavian}, redes neurais convolucionais (CNNs) como a VGG-16, em que se baseia a FuseNet, possuem a limitação de não conseguir analisar eficientemente o contexto e as fronteiras dos objetos em uma cena durante o processo de segmentação semântica.
+
+Isso explica também por que o modelo que mantém apenas ligado o bloco de fusão da CBR5 da FuseNet obteve a melhor performance nos experimentos, suplantando todos os demais. Em decorrência da limitação das CNNs supracitada e do fato de as primeiras convoluções de profundidade da VGG-16 serem maiores (\eg, 224x224 ou 112x112), o que as torna mais ruidosas, os primeiros blocos de fusão do ~\textit{branch depth} no RGB acabam por atrapalhar a convergência do modelo, sendo portanto melhor desligá-los.
+
+Tendo a modificação da FuseNet na qual se manteve ligada apenas a fusão do CBR5, treinou-se esse modelo existoso com mais 150 épocas, em um total de 200 épocas, obtendo um total de $IoU = 29,39\%$. Os resultados dos testes desse modelo novamente treinado são discriminados na figura ~\ref{fig:resultados}.
+
+
+% TODO: Copiar as figuras
+
+\begin{figure}[htb]
+\centering
+\subfigure[]{\includegraphics[width=20mm]{figs/fig41a.png}}\quad
+\subfigure[]{\includegraphics[width=20mm]{figs/fig41b.png}}\quad
+\subfigure[]{\includegraphics[width=20mm]{figs/fig41c.png}}\quad
+\subfigure[]{\includegraphics[width=20mm]{figs/fig41d.png}}\quad \\
+\subfigure[]{\includegraphics[width=20mm]{figs/fig42a.png}}\quad
+\subfigure[]{\includegraphics[width=20mm]{figs/fig42b.png}}\quad
+\subfigure[]{\includegraphics[width=20mm]{figs/fig42c.png}}\quad
+\subfigure[]{\includegraphics[width=20mm]{figs/fig42d.png}}\quad \\
+\subfigure[]{\includegraphics[width=20mm]{figs/fig44a.png}}\quad
+\subfigure[]{\includegraphics[width=20mm]{figs/fig44b.png}}\quad
+\subfigure[]{\includegraphics[width=20mm]{figs/fig44c.png}}\quad
+\subfigure[]{\includegraphics[width=20mm]{figs/fig44d.png}}\quad
+\caption{Resultados: RGB; profundidade; \textit{ground-truth}; e saída.}.
+\label{fig:resultados}
+\end{figure}
+
+Por fim, a tabela ~\ref{table:custoComp} mostra o custo computacional de treinamento dos modelos expressos em tempo médio de treinamento por época. Em que pese essa medida não possa ser avaliada em termos absolutos, uma vez que esse tempo dependa da arquitetura de computador empregada, ela pode ser avaliada em termos relativos, visto que em todos os experimentos foi-se empregado o mesmo hardware. Dessa monta, pela análise da segunda coluna, como a porcentagem de tempo que os modelos são mais rápidos em relação ao modelo original, verifica-se que esse não é nada eficiente, visto que, além de possuir perfomance similar às outras modelagens, possui um custo computacional maior. 
+
+Nada obstante, verifica-se que o tempo de treinamento médio do experimento com maior performance é praticamente o mesmo do modelo original da FuseNet. Isso é condizente com a realidade, haja vista que não foi desativada nenhuma operação de convolução do \textit{branch depth}, que possui custo computacional bem maior que a fusão em si, que se trata de uma soma trivial elemento a elemento entre tensores.
+
+\begin{table}[h!]
+	\centering
+\begin{tabular}{||c c c||} 
+ \hline
+Experimento & Tempo médio / época & \% mais rápido \\ [0.5ex]
+\hline \hline
+FuseNet Original & 183 \textit{s} & - \\
+Sem CBR 5 & 175 \textit{s} & 4,57\% \\
+Sem CBR 4-5 & 159 \textit{s} & 15,09\% \\
+Sem CBR 2-5 & 135 \textit{s} & 35,56\% \\
+Sem \textit{depth} & 120 \textit{s} & 52,50\% \\
+Somente com fusão da CBR 5 & 182 \textit{s} & 0,55\% \\
+\hline
+\end{tabular}
+\caption{Custo computacional do treinamento dos modelos em cada experimento.}
+\label{table:custoComp}
+\end{table}
+
+
+\section{Discussão, conclusões e trabalhos futuros}
+\label{sec:conc}
+
+Da análise dos resultados obtidos, comprova-se a hipótese firmada de que a informação do canal de profundidade não agrega muito em termos de perfomance, medida através da métrica IoU, especificamente no modelo de CNN denomimnado FuseNet e especificamente no dataset NYUDv2. Pela IoU apurada, escolheu-se portanto o modelo com somente a fusão do CBR 5 ligada como aprimoramento da rede FuseNet, dando-lhe o nome de \textit{LateFuseNet}, em decorrência de seguir uam abordagem \textit{late fusion}, permitindo a fusão das convoluções do \textit{branch depth} ao final do processo de \textit{encoding}.
+
+Herdando as características da VGGNet-16, a \textit{LateFuseNet} possui a desvantagem de ser extremamente lenta para ser treinada, possuindo muitos pesos e exigindo alto consumo de memória. Dessa forma, sua utilização só é indicada quando se tem hardware e tempo suficiente para treiná-la. Caso essas premissas não sejam atendidas, sugere-se a utilização do modelo \"sem \textit{branch depth}\", que possui uma performance parecida, sendo 50\% mais rápido; ou a utilização de outra abordagem existente na literatura como a RDFNet, de Seungyong \etal ~\cite{seungyong}.
+
+Nada obstante, a \textit{LateFuseNet} obteve um IoU excelente para as 13 classes mapeadas no NYUDv2, diante do treinamento total de 200 épocas mostrado na seção anterior. Como trabalhos futuros, vislumbra-se a repetição dos experimentos realizados para o mapeamento de 40 classes do NYUDv2, que é comumente utilizado em diversos outros trabalhos. Também se vislumbra a repetição do experimento para um número maior de épocas, a fim de obter uma asseguração ainda mais razoável sobre a a hipótese de a profundidade não ajudar na segmentação semântica da FuseNet. Além disso, outro desdobramento seria a repetição do experimento para o dataset SUN RGB-D ~\cite{song}, comumente utilizado em diversos trabalhos, inclusive no trabalho original proposto por Hazirbas \etal ~\cite{fusenet}.
+
+Por fim, um outro trabalho futuro seria o aprimoramento da \textit{LateFuseNet}, utilizando-se, para o \textit{branch depth}, pesos inicializados aleatoriamente, em vez de pesos do pré-treinamento da VGG-16 ~\cite{vggnet} na ImageNet ~\cite{imagenet}, como é implementada por Aygün ~\cite{aygun}. Em que pese Yosinski \etal ~\cite{yosinski} afirmar que a adaptação de domínio e \textit{transfer-learning}, por meio do \textit{fine-tuning}, poder ser melhor que a inicialização aleatória, conjectura-se que não é o caso do \textit{branch depth}, pois o treinamento da ImageNet, com 14 milhões de imagens, é excessivo, podendo impedir a convergência do modelo.
+
+De todo o exposto, entende-se que os resultados alcançados no âmbito desse trabalho são excelente, comprovando-se, com asseguração razoável, que a profundidade não auxilia muito na performance da FuseNet na segmentação semântica do NYUDv2 e propondo-se uma melhoria dessa rede, batizada de LateFuseNet.
+
+\bibliography{refs}
+\end{document}
