@@ -47,22 +47,34 @@ if [ $# -eq 1 ]; then
     if [ "$1" == "--load-data" ]; then
         load_data
     elif [ "$1" == "--train-original" ]; then
-        ln -sf models/networks_orig.py models/networks.py
+        cd models
+        ln -sf networks_orig.py networks.py
+        cd ..
         train_model
     elif [ "$1" == "--train-no-cbr5" ]; then
-        ln -sf models/networks_no_cbr5.py models/networks.py
+        cd models
+        ln -sf networks_no_cbr5.py networks.py
+        cd ..
         train_model
     elif [ "$1" == "--train-no-cbr4-5" ]; then
-        ln -sf models/networks_no_cbr4-5.py models/networks.py
+        cd models
+        ln -sf networks_no_cbr4-5.py networks.py
+        cd ..
         train_model
     elif [ "$1" == "--train-no-cbr2-5" ]; then
-        ln -sf models/networks_no_cbr2-5.py models/networks.py
+        cd models
+        ln -sf networks_no_cbr2-5.py networks.py
+        cd ..
         train_model
     elif [ "$1" == "--train-no-depth" ]; then
-        ln -sf models/networks_no_depth.py models/networks.py
+        cd models
+        ln -sf networks_no_depth.py networks.py
+        cd ..
         train_model
     elif [ "$1" == "--train-cbr5-only" ]; then
-        ln -sf models/networks_only_cbr5.py models/networks.py
+        cd models
+        ln -sf networks_only_cbr5.py networks.py
+        cd ..
         train_model
     elif [ "$1" == "--test" ]; then
         test_model
