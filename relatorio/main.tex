@@ -173,7 +173,7 @@ Há um outro fator para o canal de profundidade não fornecer ganhos à FuseNet:
 
 Isso explica também por que o modelo que mantém apenas ligado o bloco de fusão da CBR5 da FuseNet obteve a melhor performance nos experimentos, suplantando todos os demais. Em decorrência da limitação das CNNs supracitada e do fato de as primeiras convoluções de profundidade da VGG-16 serem maiores (\eg, 224x224 ou 112x112), o que as torna mais ruidosas, os primeiros blocos de fusão do ~\textit{branch depth} no RGB acabam por atrapalhar a convergência do modelo, sendo portanto melhor desligá-los.
 
-Tendo a modificação da FuseNet na qual se manteve ligada apenas a fusão do CBR5, treinou-se esse modelo existoso com mais 150 épocas, em um total de 200 épocas, obtendo um total de $IoU = 29,39\%$. Os resultados dos testes desse modelo novamente treinado são discriminados na figura ~\ref{fig:resultados}.
+Tendo a modificação da FuseNet na qual se manteve ligada apenas a fusão do CBR5, treinou-se esse modelo existoso com mais 340 épocas, em um total de 390 épocas, obtendo um total de $IoU = 40,58\%$. Os resultados dos testes desse modelo novamente treinado são discriminados na figura ~\ref{fig:resultados}.
 
 
 % TODO: Copiar as figuras
