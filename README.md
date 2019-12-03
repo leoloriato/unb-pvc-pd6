@@ -24,7 +24,7 @@ OBS: O código-fonte contido na pasta src é a implementação de [Aygün](https
 - Pasta _relatorio_ com código fonte do relatório
 - Arquivo _Leonardo_Loriato.pdf_ com o relatório
 - Pasta _src_ contendo o código principal do projeto, cujos principais arquivos são:
-  - _pd5.py_ - Arquivo principal do projeto, que deve ser executado para fins de verificação da tarefa
+  - _pd6.sh_ - Arquivo principal do projeto, que deve ser executado para fins de verificação da tarefa
   - _train.py_ - Programa do Aygün utilizado para treinamento do FuseNet
   - _test.py_ - Programa do Aygün utilizado para teste do FuseNet
   - _requirements.txt_ - Arquivos com as dependências Python do Projeto
